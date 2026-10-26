@@ -23,6 +23,14 @@ namespace NetworkSkins.Patches.NetSegment
         [ThreadStatic]
         public static NetInfo.Segment[] CurrentCustomSegments;
 
+        /// <summary>
+        /// The original info.m_segments array that CurrentCustomSegments was derived from.
+        /// RenderSegments only uses the custom array when it is called with this very array,
+        /// so a stale value can never leak onto a segment/info of another network type.
+        /// </summary>
+        [ThreadStatic]
+        public static NetInfo.Segment[] CurrentOriginalSegments;
+
         public static bool PatchLanesAndSegments(ILGenerator il, List<CodeInstruction> codes, CodeInstruction infoLdInstruction, CodeInstruction segmentIdLdInstruction, ref int index)
         {
             var netInfoLanesField = typeof(NetInfo).GetField("m_lanes");
@@ -31,7 +39,8 @@ namespace NetworkSkins.Patches.NetSegment
             var networkSkinLanesField = typeof(NetworkSkin).GetField("m_lanes");
             var networkSkinSegmentsField = typeof(NetworkSkin).GetField("m_segments");
             var currentCustomSegmentsField = typeof(NetSegmentRenderPatch).GetField(nameof(CurrentCustomSegments));
-            if (netInfoLanesField == null || netInfoSegmentsField == null || segmentSkinsField == null || networkSkinLanesField == null || networkSkinSegmentsField == null || currentCustomSegmentsField == null)
+            var currentOriginalSegmentsField = typeof(NetSegmentRenderPatch).GetField(nameof(CurrentOriginalSegments));
+            if (currentOriginalSegmentsField == null || netInfoLanesField == null || netInfoSegmentsField == null || segmentSkinsField == null || networkSkinLanesField == null || networkSkinSegmentsField == null || currentCustomSegmentsField == null)
             {
                 Debug.LogError("Necessary field not found. Cancelling transpiler!");
                 return false;
@@ -51,6 +60,11 @@ namespace NetworkSkins.Patches.NetSegment
                 // NetSegmentRenderPatch.CurrentCustomSegments = null;  ← toujours, en premier, avant tout branchement
                 new CodeInstruction(OpCodes.Ldnull),
                 new CodeInstruction(OpCodes.Stsfld, currentCustomSegmentsField),
+
+                // NetSegmentRenderPatch.CurrentOriginalSegments = info.m_segments;
+                new CodeInstruction(infoLdInstruction), // info
+                new CodeInstruction(OpCodes.Ldfld, netInfoSegmentsField),
+                new CodeInstruction(OpCodes.Stsfld, currentOriginalSegmentsField),
 
                 // NetInfo.Lane[] customLanes = info.m_lanes;
                 new CodeInstruction(infoLdInstruction), // info

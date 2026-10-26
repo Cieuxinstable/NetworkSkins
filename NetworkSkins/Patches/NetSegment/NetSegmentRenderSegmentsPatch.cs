@@ -70,7 +70,12 @@ namespace NetworkSkins.Patches.NetSegment
         /// </summary>
         public static NetInfo.Segment[] ResolveSegments(NetInfo.Segment[] infoSegments)
         {
-            return NetSegmentRenderPatch.CurrentCustomSegments ?? infoSegments;
+            var custom = NetSegmentRenderPatch.CurrentCustomSegments;
+            if (custom != null && ReferenceEquals(NetSegmentRenderPatch.CurrentOriginalSegments, infoSegments))
+            {
+                return custom;
+            }
+            return infoSegments;
         }
     }
 }
